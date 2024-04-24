@@ -1,6 +1,9 @@
 ### Installation
 Install poetry on your machine. Then run "poetry install" on this folder.
 
+Next set the python path before running the app or upgrade db:
+set PYTHONPATH=src
+
 ### DB Migration
 
 Create a model in models folder (as user.py)
@@ -28,6 +31,9 @@ If need to undo use the following command to revert the current migration file i
 To delete migration file. manually delete it from alembic-migration/versions folder.
 
 ### To run
+create .env file from sample and put credentials in it.
+
+set PYTHONPATH=src
 poetry shell
 uvicorn main:app --reload
 
