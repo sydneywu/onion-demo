@@ -14,8 +14,9 @@ Use the following command to create a new migration file in alembic-migration/ve
 This command needs to be run on root folder:
 
 WINDOWS
+$env:PYTHONPATH="src"
 $timestamp = Get-Date -Format "yyyyMMddHHmmss"
-alembic revision  --autogenerate --rev-id=$timestamp -m "add_user"
+alembic revision  --autogenerate --rev-id=$timestamp -m "add_comment"
 
 LINUX
 alembic revision  --autogenerate --rev-id=$(date +%Y%m%d%H%M%S) -m "add_user"

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, func
+from sqlalchemy.orm import relationship
 
 from domain.models.user import User
 from infrastructure.db.base_class import Base
@@ -18,6 +19,9 @@ class UserOrmModel(Base):
     is_deleted = Column(Boolean)
     deleted_at = Column(DateTime)
     deleted_by = Column(Integer)
+    
+    # Relationship with Comment model
+    comments = relationship("CommentOrmModel", back_populates="user")
 
     @staticmethod
     def from_domain(user: User):
