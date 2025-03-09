@@ -14,5 +14,6 @@ class User(UserBase):
     created_by: Optional[int] = None
     updated_at: Optional[datetime] = None
     updated_by: Optional[int] = None
+    is_deleted: bool = False
     deleted_at: Optional[datetime] = None
-    deleted_by: Optional[datetime] = None
+    deleted_by: Optional[int] = None

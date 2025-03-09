@@ -23,6 +23,8 @@ For each domain (e.g., Supplier, Ingredient), you should create:
 ## Domain Model Guidelines
 - Base class with domain-specific fields
 - Full entity class with audit fields (created_at, updated_at, etc.)
+- Always include `is_deleted: bool = False` field for soft delete functionality
+- Include deleted_at and deleted_by fields for tracking deletion metadata
 
 ## Repository Interface Guidelines
 - Abstract methods for CRUD operations (add, get_by_id, get_all, update, delete)
@@ -51,6 +53,16 @@ For each domain (e.g., Supplier, Ingredient), you should create:
 ## API Endpoint Guidelines
 - FastAPI router with CRUD endpoints
 - Proper error handling and status codes
+
+## Dependency Injection Guidelines
+- Create dependency functions in `src/api/deps.py` for use case initialization
+- Example pattern:
+```python
+def get_{domain_name}_use_cases(db: AsyncSession = Depends(get_db)) -> {DomainName}UseCases:
+    {domain_name}_repository = SQL{DomainName}Repository(db)
+    return {DomainName}UseCases({domain_name}_repository)
+```
+- Use these dependencies in endpoints instead of initializing repositories and use cases directly
 
 ## Router Update Reminder
 After creating a new domain suite, remember to update `src/api/router.py` to include the new endpoint.
