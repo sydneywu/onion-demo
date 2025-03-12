@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
@@ -21,8 +21,18 @@ class SQLUserRepository(UserRepository):
         await self.db_session.merge(orm_user)
         await self.db_session.commit()
 
-    async def get_by_email(self, email: str) -> User:
+    async def get_by_email(self, email: str) -> Optional[User]:
         result = await self.db_session.execute(select(UserOrmModel).filter(UserOrmModel.email == email))
+        orm_user = result.scalars().first()
+
+        if orm_user is None:
+            return None
+
+        user = orm_user.to_domain()
+        return user
+        
+    async def get_by_id(self, user_id: int) -> Optional[User]:
+        result = await self.db_session.execute(select(UserOrmModel).filter(UserOrmModel.id == user_id))
         orm_user = result.scalars().first()
 
         if orm_user is None:

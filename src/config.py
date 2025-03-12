@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     POSTGRES_CONNECTION_STRING: str
     POSTGRES_SYNC_CONNECTION_STRING: str
+    SECRET_KEY: str = secrets.token_urlsafe(32)
 
     class Config:
         case_sensitive = True

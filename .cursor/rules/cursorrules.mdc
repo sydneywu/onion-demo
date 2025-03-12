@@ -1,9 +1,88 @@
 ---
-description:
-globs:
+description: 
+globs: 
+alwaysApply: false
 ---
+# Domain Suite Generator Rules
 
-# Your rule content
+You are an expert in clean architecture and Python FastAPI development. When I ask you to create a new domain suite, you will help me generate all the necessary files following the structure below.
 
-- You can @ files here
-- You can use markdown but dont have to
+## Domain Structure
+For each domain (e.g., Supplier, Ingredient), you should create:
+
+### 1. Domain Layer
+- Domain model at `src/domain/models/{domain_name}.py`
+- Repository interface at `src/domain/repositories/{domain_name}_repository.py`
+
+### 2. Application Layer
+- DTOs at `src/application/dto/{domain_name}_dto.py`
+- Use cases at `src/application/use_cases/{domain_name}_use_cases.py`
+
+### 3. Infrastructure Layer
+- ORM model at `src/infrastructure/orm/{domain_name}_orm_model.py`
+- SQL repository at `src/infrastructure/repositories/sql_{domain_name}_repository.py`
+
+### 4. API Layer
+- Endpoint at `src/api/endpoints/{domain_name}_endpoint.py`
+
+## Domain Model Guidelines
+- Base class with domain-specific fields
+- Full entity class with audit fields (created_at, updated_at, etc.)
+- Always include `is_deleted: bool = False` field for soft delete functionality
+- Include deleted_at and deleted_by fields for tracking deletion metadata
+
+## Repository Interface Guidelines
+- Abstract methods for CRUD operations (add, get_by_id, get_all, update, delete)
+
+## DTO Guidelines
+- CreateDTO class for creation operations
+- UpdateDTO class for update operations
+
+## Use Cases Guidelines
+- Methods for all CRUD operations
+- Proper error handling
+
+## ORM Model Guidelines
+- SQLAlchemy model definition
+- Mapping methods between domain and ORM models
+
+## SQL Repository Guidelines
+- Implementation of the repository interface
+- SQLAlchemy queries for all CRUD operations
+
+## SQLAlchemy Async Operations Guidelines
+- After adding an entity and calling `flush()`, always call `refresh()` on the entity before accessing generated IDs
+- Ensure proper sequence of operations: add → flush → refresh → access ID → commit
+- Remember that all SQLAlchemy operations must be awaited in async context
+
+## API Endpoint Guidelines
+- FastAPI router with CRUD endpoints
+- Proper error handling and status codes
+
+## Dependency Injection Guidelines
+- Create dependency functions in `src/api/deps.py` for use case initialization
+- Example pattern:
+```python
+def get_{domain_name}_use_cases(db: AsyncSession = Depends(get_db)) -> {DomainName}UseCases:
+    {domain_name}_repository = SQL{DomainName}Repository(db)
+    return {DomainName}UseCases({domain_name}_repository)
+```
+- Use these dependencies in endpoints instead of initializing repositories and use cases directly
+
+## Router Update Reminder
+After creating a new domain suite, remember to update `src/api/router.py` to include the new endpoint.
+
+## Alembic Migration Reminder
+Remember to update `alembic/env.py` to import the new ORM model:
+```python
+from infrastructure.orm.{domain_name}_orm_model import Base
+```
+This ensures Alembic can detect and generate migrations for the new model.
+
+## Usage Instructions
+When I ask you to "create a domain suite for [DomainName]", you should:
+
+1. Generate all the files listed above with proper content
+2. Remind me to update the router.py file
+3. add import of the orm_model the alembic/env.py file
+4. Suggest any domain-specific fields that might be relevant for this domain 

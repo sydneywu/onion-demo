@@ -1,0 +1,314 @@
+---
+description: context for new login task
+globs: 
+alwaysApply: false
+---
+# Login Implementation Details
+
+## Overview
+This document outlines the implementation details for the login functionality in the application, adapted to use email instead of mobile phone numbers. The login flow follows a clean architecture pattern with distinct layers:
+
+1. API Layer (Endpoints)
+2. Application Layer (Use Cases)
+3. Domain Layer (Models)
+4. Infrastructure Layer (Repositories)
+
+## 1. API Layer - Login Endpoint
+
+### File: src/api/endpoints/auth_endpoint.py
+
+```python
+@router.post("/login", response_model=dict)
+async def login_access_token(
+    form_data: UserLoginDTO,
+    auth_use_cases: AuthUseCases = Depends(get_auth_use_cases)
+):
+    new_login = await auth_use_cases.login_access_token(form_data)
+    if not new_login.access_token:
+        raise HTTPException(status_code=400, detail="Wrong User")
+    return {
+        "error_message": None,
+        "success": True,
+        "error_code": None,
+        "access_token": new_login.access_token
+    }
+```
+
+This endpoint:
+- Accepts a UserLoginDTO containing email and password
+- Uses dependency injection to get the AuthUseCases
+- Calls the login_access_token method on the AuthUseCases
+- Returns a success response with the access token or raises an HTTPException
+
+## 2. Application Layer - Auth Use Cases
+
+### File: src/application/use_cases/auth_use_cases.py
+
+```python
+class AuthUseCases:
+    def __init__(self, auth_repository: AuthRepository, otp_repository: OtpRepository):
+        self.auth_repository = auth_repository
+        self.otp_repository = otp_repository
+
+    async def login_access_token(self, form_data: Login) -> Token:
+        token = await self.auth_repository.login_access_token(form_data)
+        return token
+```
+
+The AuthUseCases class:
+- Takes an AuthRepository and OtpRepository in its constructor
+- Provides a login_access_token method that delegates to the auth_repository
+- Returns a Token object
+
+## 3. Domain Layer - Models
+
+### File: src/domain/models/login.py
+
+```python
+class Login(BaseModel):
+    email: str  # Changed from mobile
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class TokenPayload(BaseModel):
+    sub: Optional[int] = None
+    role_id: Optional[int] = None
+    tenant_id: Optional[int] = None
+```
+
+The domain models:
+- Login: Contains email and password fields (adapted from mobile)
+- Token: Contains the access_token and token_type
+- TokenPayload: Contains the data encoded in the JWT token
+
+### File: src/application/dto/auth_dto.py
+
+```python
+class UserLoginDTO(BaseModel):
+    email: str  # Changed from mobile
+    password: str
+```
+
+The UserLoginDTO:
+- Represents the data transfer object for login requests
+- Contains email and password fields (adapted from mobile)
+
+## 4. Infrastructure Layer - Auth Repository
+
+### File: src/domain/repositories/auth_repository.py
+
+```python
+class AuthRepository(ABC):
+    @abstractmethod
+    async def login_access_token(self, form_data: Login) -> Token:
+        pass
+```
+
+The AuthRepository interface:
+- Defines the contract for authentication repositories
+- Requires implementing a login_access_token method
+
+### File: src/infrastructure/repositories/sql_auth_repository.py
+
+```python
+class SQLAuthRepository(AuthRepository):
+    def __init__(self, db_session: AsyncSession):
+        self.db_session = db_session
+
+    async def login_access_token(self, form_data: Login) -> Token:
+        # Query the user by email instead of mobile
+        result = await self.db_session.execute(select(UserOrmModel).filter(UserOrmModel.email == form_data.email))
+        orm_user = result.scalars().first()
+        
+        if orm_user is None:
+            raise HTTPException(status_code=400, detail="Wrong User")
+            
+        if not verify_password(form_data.password, orm_user.password):
+            raise HTTPException(status_code=400, detail="Wrong Email / Password")
+
+        user = orm_user.to_domain()
+
+        # Get user role
+        user_role_result = await self.db_session.execute(select(UserRoleOrmModel).filter(UserRoleOrmModel.user_id == user.id))
+        orm_user_role = user_role_result.scalars().first()
+        user_role = orm_user_role.to_domain()
+
+        if not user.is_active:
+            raise HTTPException(status_code=400, detail="Inactive user")
+            
+        # Create and return JWT token
+        access_token_expires = datetime.timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+        return Token(
+            access_token=create_access_token(user.id, user_role.role_id, user.tenant_id, expires_delta=access_token_expires)
+        )
+```
+
+The SQLAuthRepository implementation:
+- Takes a database session in its constructor
+- Implements the login_access_token method:
+  - Queries the database for a user with the given email
+  - Verifies the password using the security utility
+  - Gets the user's role
+  - Creates and returns a JWT token
+
+## 5. Database Model
+
+### File: src/infrastructure/orm/user_orm_model.py
+
+```python
+class UserOrmModel(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=func.current_timestamp())
+    updated_at = Column(DateTime, nullable=False, default=func.current_timestamp(), onupdate=func.current_timestamp())
+    email = Column(String(96), nullable=False, unique=True, index=True)  # Primary login field
+    firstname = Column(String(32), nullable=False)
+    lastname = Column(String(32), nullable=False)
+    password = Column(String(255), nullable=False)
+    is_active = Column(Boolean(), default=True)
+    is_superuser = Column(Boolean(), default=False)
+    tenant_id = Column(Integer, ForeignKey('tenants.id'))
+    # Other fields...
+
+    def to_domain(self) -> User:
+        """Convert this UserOrmModel instance to a User domain model."""
+        return User(
+            id=self.id,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            email=self.email,
+            firstname=self.firstname,
+            lastname=self.lastname,
+            password=self.password,
+            is_active=self.is_active,
+            is_superuser=self.is_superuser,
+            tenant_id=self.tenant_id,
+            # Other fields...
+        )
+```
+
+The UserOrmModel:
+- Represents the users table in the database
+- Contains email as the primary login field (adapted from mobile)
+- Provides methods to convert between ORM and domain models
+
+## 6. Security Utilities
+
+### File: src/utils/security.py
+
+```python
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def create_access_token(subject: Union[str, Any], role_id: Union[str, Any], tenant_id: Union[str, Any], expires_delta: timedelta) -> str:
+    expire = datetime.utcnow() + expires_delta
+    to_encode = {"exp": expire, "sub": str(subject), "role_id": str(role_id), "tenant_id": str(tenant_id)}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+```
+
+The security utilities:
+- verify_password: Verifies a plain password against a hashed password
+- get_password_hash: Hashes a password
+- create_access_token: Creates a JWT token with the given payload
+
+## 7. Dependency Injection
+
+### File: src/api/di.py
+
+```python
+def get_auth_use_cases(db: AsyncSession = Depends(get_db)) -> AuthUseCases:
+    auth_repository = SQLAuthRepository(db)
+    otp_repository = SQLOtpRepository(db)
+    return AuthUseCases(auth_repository, otp_repository)
+```
+
+The dependency injection:
+- Provides a function to get the AuthUseCases
+- Creates and injects the necessary repositories
+
+## 8. Authentication Middleware
+
+### File: src/api/deps.py
+
+```python
+async def get_current_user(db: Session = Depends(get_db), credentials: HTTPBasicCredentials = Depends(reusable_oauth2)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(
+            token, settings.JWT_SECRET, algorithms=["HS256"]
+        )
+        token_data = TokenPayload(**payload)
+        
+        # Get user by ID
+        user_repository = SQLUserRepository(db)
+        auth_repository = SQLAuthRepository(db)
+        otp_repository = SQLOtpRepository(db)
+        user_service = UserUseCases(user_repository, auth_repository, otp_repository)
+        user = await user_service.get_by_id(token_data.sub)
+
+        if not user:
+            raise HTTPException(status_code=400, detail="Wrong User")
+
+        # Get role
+        role_repository = SQLRoleRepository(db)
+        role_service = RoleUseCases(role_repository)
+        role = await role_service.get_by_id(token_data.role_id, user)
+
+        if not role:
+            raise HTTPException(status_code=400, detail="Wrong Role")
+
+        # Get tenant
+        tenant_repository = SQLTenantRepository(db)
+        tenant_service = TenantUseCases(tenant_repository)
+        tenant = await tenant_service.get_by_id(token_data.tenant_id, user)
+
+        return {"user": user, "role": role, "tenant": tenant}
+
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired"
+        )
+    except (JWTError, ValidationError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials"
+        )
+```
+
+The authentication middleware:
+- Extracts and validates the JWT token
+- Gets the user, role, and tenant based on the token payload
+- Returns the authenticated user or raises an exception
+
+## 9. Key Differences from Original Implementation
+
+## 10. Complete Login Flow
+
+1. User submits email and password to the `/login` endpoint
+2. The endpoint calls `auth_use_cases.login_access_token()`
+3. The use case delegates to `auth_repository.login_access_token()`
+4. The repository:
+   - Queries the database for a user with the given email
+   - Verifies the password
+   - Gets the user's role
+   - Creates and returns a JWT token
+5. The endpoint returns the token to the client
+6. The client includes the token in subsequent requests
+7. The `get_current_user` middleware validates the token and provides the user context
+
+## 11. Error Handling
+
+- Invalid email: Returns 400 Bad Request with "Wrong User" message
+- Invalid password: Returns 400 Bad Request with "Wrong Email / Password" message
+- Inactive user: Returns 400 Bad Request with "Inactive user" message
+- Expired token: Returns 401 Unauthorized with "Token has expired" message
+- Invalid token: Returns 403 Forbidden with "Could not validate credentials" message 
