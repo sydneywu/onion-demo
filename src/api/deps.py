@@ -14,6 +14,8 @@ from application.use_cases.auth_use_cases import AuthUseCases
 from infrastructure.repositories.sql_auth_repository import SQLAuthRepository
 from domain.models.auth import TokenPayload
 from utils.security import SECRET_KEY, ALGORITHM
+from application.use_cases.ingredient_use_cases import IngredientUseCases
+from infrastructure.repositories.sql_ingredient_repository import SQLIngredientRepository
 
 
 security = HTTPBearer()
@@ -37,6 +39,11 @@ async def get_user_use_cases(db: AsyncSession = Depends(get_db)) -> UserUseCases
 async def get_auth_use_cases(db: AsyncSession = Depends(get_db)) -> AuthUseCases:
     auth_repository = SQLAuthRepository(db)
     return AuthUseCases(auth_repository)
+
+
+async def get_ingredient_use_cases(db: AsyncSession = Depends(get_db)) -> IngredientUseCases:
+    ingredient_repository = SQLIngredientRepository(db)
+    return IngredientUseCases(ingredient_repository)
 
 
 async def get_current_user(

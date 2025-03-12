@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Any, Union
 from jose import jwt
 from passlib.context import CryptContext
-from src.config import settings
+from config import settings
 
 # Constants
 SECRET_KEY = settings.SECRET_KEY

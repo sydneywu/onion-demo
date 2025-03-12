@@ -10,6 +10,7 @@ from infrastructure.db import Base
 
 from infrastructure.orm.user_orm_model import Base
 from infrastructure.orm.comment_orm_model import Base
+from infrastructure.orm.ingredient_orm_model import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

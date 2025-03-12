@@ -5,8 +5,13 @@ from typing import AsyncGenerator
 from infrastructure.db.session import SessionLocal  # type: ignore
 import uvicorn
 from api.router import api_router  # type: ignore
+from config import settings
 
-app = FastAPI()
+app = FastAPI(
+    docs_url="/shaker_docs",
+    redoc_url=None,  # Disable ReDoc
+    swagger_ui_parameters={"persistAuthorization": True}
+)
 app.include_router(api_router, prefix='/api')
 
 
@@ -17,4 +22,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8018)
+    uvicorn.run(
+        app, 
+        host=settings.API_HOST, 
+        port=settings.API_PORT
+    )

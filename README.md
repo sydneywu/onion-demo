@@ -35,6 +35,9 @@ To delete migration file. manually delete it from alembic-migration/versions fol
 create .env file from sample and put credentials in it.
 
 set PYTHONPATH=src
+or
+$env:PYTHONPATH="src" (on windows)
+
 poetry shell
 uvicorn main:app --reload
 

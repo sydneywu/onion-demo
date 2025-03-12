@@ -7,6 +7,9 @@ from pydantic import AnyHttpUrl, PostgresDsn, validator
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    # API Settings
+    API_PORT: int = 8030  # Default port
+    API_HOST: str = "0.0.0.0"  # Default host
 
     POSTGRES_CONNECTION_STRING: str
     POSTGRES_SYNC_CONNECTION_STRING: str
